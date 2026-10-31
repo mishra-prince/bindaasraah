@@ -1,5 +1,7 @@
 # BindaasRaah v0.2 — Real-map navigation beta
 
+[Open the public beta](https://bindaasraah-beta.onrender.com/) · [CI checks](https://github.com/mishra-prince/bindaasraah/actions)
+
 **Ghoomo Bindaas. Travel informed.** A mobile-friendly, installable **progressive web app** for night-journey preparation, based on real map tiles and optionally live routing/place data.
 
 > **Not a safety-certified route planner, emergency service, or functioning women-only social network.** Streetlight conditions, people activity, gender counts, and staff availability are generally **unknown**. Do not use an unverified route recommendation as proof of safety. For an immediate emergency in India, call **112**.
@@ -123,3 +125,7 @@ Use the GitHub Actions test workflow and Render Blueprint supplied in this packa
 ## Hosting privacy
 
 The application does not write journey histories to the backend. The hosting provider and upstream map/data services may retain network and access logs under their own policies. Do not interpret local-only journey storage as a promise of anonymous network access.
+
+### Automatic deployment
+
+Pushes to `main` run the Python and JavaScript checks in GitHub Actions. Render deploys the commit after CI checks pass. The frontend and Python API share the HTTPS origin above. The free service can take 50 seconds or more to wake after inactivity.
