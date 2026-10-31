@@ -1,0 +1,25 @@
+name: Verify BindaasRaah
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Python unit and server tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: JavaScript tests
+        run: npm test
+      - name: JavaScript syntax validation
+        run: npm run check

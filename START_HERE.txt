@@ -1,0 +1,27 @@
+BindaasRaah v0.2 — Quick Start
+==============================
+
+1. Extract bindaasraah-v02.zip in Downloads.
+2. Terminal:
+     cd ~/Downloads/bindaasraah-v02
+     python3 server.py
+3. Browser: http://localhost:8765
+
+If your old v0.1 server is already running, press Control+C in its Terminal,
+OR run:
+     PORT=8766 python3 server.py
+and open http://localhost:8766
+
+What is real: OpenStreetMap map tiles, geocoding on search, public Valhalla
+walking/driving routes (best effort), explicit nearby/along-route OSM place
+lookups and sampled OSM streetlight lit tags. Requires internet.
+
+What is NOT real or deployed: verified safety rating, live gender/phone counts,
+working/staffed help verification, women-only user verification, matching,
+private chat or emergency dispatch. Demo fallback cards are fictional.
+
+For better route reliability use your own OpenRouteService key:
+     export ORS_API_KEY='your_key'
+     python3 server.py
+
+For immediate danger in India call 112. Read README.md first.

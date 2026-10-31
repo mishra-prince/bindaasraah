@@ -1,0 +1,19 @@
+# Render Blueprint for BindaasRaah navigation beta.
+# Deploy as a Web Service (not a Static Site): /api needs Python.
+services:
+  - type: web
+    name: bindaasraah-beta
+    runtime: python
+    plan: free
+    branch: main
+    buildCommand: python3 -m compileall -q server.py
+    startCommand: python3 server.py
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: BIND_HOST
+        value: 0.0.0.0
+      # Configure ORS_API_KEY manually in Render's Environment settings.
+      # Do not commit keys to source control or render.yaml.
