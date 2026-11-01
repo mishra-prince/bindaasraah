@@ -1,4 +1,4 @@
-# BindaasRaah v0.2 — Real-map navigation beta
+# BindaasRaah v0.3 — Real-map navigation beta
 
 [Open the public beta](https://bindaasraah-beta.onrender.com/) · [CI checks](https://github.com/mishra-prince/bindaasraah/actions)
 
@@ -129,3 +129,11 @@ The application does not write journey histories to the backend. The hosting pro
 ### Automatic deployment
 
 Pushes to `main` run the Python and JavaScript checks in GitHub Actions. Render deploys the commit after CI checks pass. The frontend and Python API share the HTTPS origin above. The free service can take 50 seconds or more to wake after inactivity.
+
+## MapLibre map upgrade
+
+The map now uses bundled MapLibre GL JS 6.16.0 with a bundled Leaflet 1.9.4 fallback for devices without WebGL. No CDN is required to load these libraries. Map tiles still require an internet connection. Start/end markers, route visibility, listed-service visibility, fit-journey and an expanded map view are available. Provider-returned routes are the only paths drawn; illustrative demo cards never become map geometry.
+
+Without a map key, MapLibre renders OpenStreetMap raster tiles. To enable MapTiler vector streets, set `MAPTILER_API_KEY` in Render environment settings and redeploy. This key is intentionally sent to browsers through `/api/map-config`; use a browser map key restricted to the app domain and provider usage limits. Do not put a private credential in this setting. `ORS_API_KEY` stays server-side. MapTiler use is subject to its account plan and terms. No MapTiler subscription or key was created for this release.
+
+MapTiler style errors switch to the OpenStreetMap basemap. If MapLibre cannot initialise, the standard Leaflet map is used. Neither map renderer verifies streetlight operation, crowd activity or service readiness. Service markers appear only after a successful explicit assistance lookup.

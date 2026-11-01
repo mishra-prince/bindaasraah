@@ -1,4 +1,4 @@
-"""BindaasRaah v0.2 local research server (stdlib only).
+"""BindaasRaah v0.3 local research server (stdlib only).
 
 Routing: OpenRouteService when ORS_API_KEY set, otherwise rate-limited public
 Valhalla *demo* service. Public demo servers are NOT production infrastructure.
@@ -29,6 +29,11 @@ USER_AGENT = 'BindaasRaah/0.2 (local educational navigation beta; +https://githu
 LOCK = threading.Lock()
 CACHE = {}  # RAM only, no personal location histories on disk
 LAST = {'geocode': None, 'places': None, 'routes': None, 'lighting': None}
+
+
+def map_config():
+    # This is a browser-visible map credential, never the private ORS server key.
+    return {'maptilerKey': os.getenv('MAPTILER_API_KEY', '').strip()}
 
 
 def parse_number(value, lower, upper, label):
@@ -331,6 +336,8 @@ class Handler(SimpleHTTPRequestHandler):
                 params = urllib.parse.parse_qs(parsed.query)
                 if parsed.path == '/api/health':
                     data = {'status': 'ok', 'service': 'bindaasraah'}
+                elif parsed.path == '/api/map-config':
+                    data = map_config()
                 elif parsed.path == '/api/status':
                     data = {'routingConfigured': True, 'routingProvider': 'OpenRouteService' if ORS_KEY else 'Valhalla public demo',
                             'routingKeyRequired': False, 'placesAvailableOnDemand': True,
@@ -407,6 +414,6 @@ class Handler(SimpleHTTPRequestHandler):
 if __name__ == '__main__':
     port = int(os.getenv('PORT', '8765'))
     provider = 'OpenRouteService' if ORS_KEY else 'Valhalla public demo (fair-use)'
-    print(f'BindaasRaah v0.2 http://localhost:{port} | Routing: {provider}', flush=True)
+    print(f'BindaasRaah v0.3 http://localhost:{port} | Routing: {provider}', flush=True)
     host = os.getenv('BIND_HOST', '0.0.0.0' if os.getenv('RENDER') else '127.0.0.1')
     ThreadingHTTPServer((host, port), Handler).serve_forever()

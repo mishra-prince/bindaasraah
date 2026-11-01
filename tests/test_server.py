@@ -108,3 +108,11 @@ class APIValidationTests(TestCase):
     def test_invalid_lighting_samples(self):
         with self.assertRaises(ValueError):server.build_overpass_query([(91,77.2)])
 
+
+class MapConfigurationTests(TestCase):
+    def test_only_browser_map_key_exposed(self):
+        with mock.patch.dict(server.os.environ, {'MAPTILER_API_KEY':'browser-key','ORS_API_KEY':'private-routing-key'}):
+            self.assertEqual(server.map_config(), {'maptilerKey':'browser-key'})
+    def test_no_map_key_required(self):
+        with mock.patch.dict(server.os.environ, {}, clear=True):
+            self.assertEqual(server.map_config(), {'maptilerKey':''})

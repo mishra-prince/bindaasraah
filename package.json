@@ -1,9 +1,9 @@
 {
  "name":"bindaasraah-research-pwa",
- "version":"0.2.0",
+ "version":"0.3.0",
  "private":true,
  "type":"module",
  "description":"Privacy-conscious night journey research prototype",
- "scripts":{"test":"node --test tests/model.test.mjs","check":"node --check web/app.js && node --check web/model.mjs"},
+ "scripts":{"test":"node --test tests/*.test.mjs","check":"node --check web/app.js && node --check web/model.mjs && node --check web/map.mjs && node --check web/map-data.mjs"},
  "license":"MIT"
 }

@@ -1,10 +1,11 @@
+import {createJourneyMap} from './map.mjs';
 import {STOPS, DEMO_WARNING, demoRoutes, routeEvidence, escapeHtml, mapStatus, compactCoordinate, validateLocalReport, safeStoredJson, normalizeCategory, displayCategory, routeSamples} from './model.mjs';
 
 const $=id=>document.getElementById(id);
 const REPORT_KEY='br_local_reports_v01';
 const JOURNEY_KEY='br_local_journey_v01';
 const PAGE_TITLES={explore:'A journey that feels more prepared',journey:'Your journey, your choice',assistance:'Know where to find help',reports:'Make every observation count',circle:'Better together, only by choice',privacy:'Privacy is the starting point'};
-const state={page:'explore', mode:'walk', originKey:'cp', destKey:'indiaGate',customOrigin:null,customDest:null,routes:demoRoutes(), selectedRouteId:'demo-0', routeMode:'demo', places:[],placeMode:'none',filter:'all', status:{routingConfigured:false}, map:null, mapLayer:null,poiLayer:null,mapPick:'origin', trip:safeStoredJson(localStorage,JOURNEY_KEY,null), reports:safeStoredJson(localStorage,REPORT_KEY,[])};
+const state={page:'explore', mode:'walk', originKey:'cp', destKey:'indiaGate',customOrigin:null,customDest:null,routes:demoRoutes(), selectedRouteId:'demo-0', routeMode:'demo', places:[],placeMode:'none',filter:'all', status:{routingConfigured:false}, map:null,showRoute:true,showPlaces:true,mapPick:'origin', trip:safeStoredJson(localStorage,JOURNEY_KEY,null), reports:safeStoredJson(localStorage,REPORT_KEY,[])};
 let toastTimer=null;
 let currentCoords=null; // ephemeral; never saved
 
@@ -17,6 +18,7 @@ function go(page){
   if(page==='assistance')renderPlaces();
   if(page==='journey')renderTrip();
   if(page==='reports')renderReports();
+  if(page==='explore')requestAnimationFrame(()=>journeyMap?.resize());
   window.scrollTo({top:0,behavior:'instant'});
 }
 function origin(){return state.originKey==='custom'?state.customOrigin:STOPS[state.originKey];}
@@ -47,6 +49,7 @@ async function findRoutes(){
   if(Math.abs(start.lat-end.lat)<.00001&&Math.abs(start.lon-end.lon)<.00001){toast('Choose a different start and destination.');return;}
   const btn=$('findRoutesBtn');btn.disabled=true;btn.textContent='Finding your route…';
   try{
+    if(!state.status.routingConfigured)await loadStatus();
     if(!state.status.routingConfigured)throw new Error('demo');
     const params=new URLSearchParams({origin_lat:start.lat,origin_lon:start.lon,dest_lat:end.lat,dest_lon:end.lon,mode:state.mode});
     const res=await fetch(`/api/routes?${params}`);
@@ -63,62 +66,37 @@ async function findRoutes(){
     drawMap();
   }finally {btn.disabled=false;btn.innerHTML='Explore route options <span>↗</span>';renderRoutes();}
 }
-function ensureMap(){
-  if(state.map)return true;
-  if(!window.L){$('mapBadge').textContent='Map library unavailable — check connection';return false;}
-  $('map').style.display='block';$('mapFallback').style.display='none';
-  state.map=L.map('map',{zoomControl:true,attributionControl:true}).setView([28.6304,77.2180],12);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a>',
-    maxZoom:19,
-  }).addTo(state.map);
-  state.map.on('click',e=>{
-    const point={name:'Selected map point',lat:e.latlng.lat,lon:e.latlng.lng};
-    if(state.mapPick==='origin'){
-      state.customOrigin=point;state.originKey='custom';$('originSelect').value='custom';
-    }else{
-      state.customDest=point;state.destKey='custom';$('destinationSelect').value='custom';
-    }
-    invalidateExistingRoutes();
-    toast(`${state.mapPick==='origin'?'Starting point':'Destination'} chosen on map. Tap Explore route options.`);
-  });
-  setTimeout(()=>state.map?.invalidateSize(),80);
-  return true;
-}
+let journeyMap=null;
+let mapPositionKey='';
+function mapSnapshot(){return {...state,start:origin(),end:destination()};}
 function drawMap(){
-  if(!ensureMap())return;
-  if(state.mapLayer){state.map.removeLayer(state.mapLayer);state.mapLayer=null;}
-  const palette=['#159c85','#dc9d52','#8691eb'],layers=[];
-  if(state.routeMode==='live'){
-    for(let i=0;i<state.routes.length;i++){
-      const r=state.routes[i];if(!r.points||r.points.length<2)continue;
-      const active=r.id===state.selectedRouteId;
-      const line=L.polyline(r.points,{color:palette[i]||'#b6c4ca',weight:active?7:4,opacity:active?1:.58});
-      line.on('click',()=>setRoute(r.id));layers.push(line);
-    }
-  }
-  const start=origin(),end=destination();
-  if(start){const pop=document.createElement('span');pop.textContent='Start: '+start.name;layers.push(L.circleMarker([start.lat,start.lon],{radius:10,color:'#0d2a31',weight:3,fillColor:'#20b59a',fillOpacity:1}).bindPopup(pop));}
-  if(end){const pop=document.createElement('span');pop.textContent='Destination: '+end.name;layers.push(L.circleMarker([end.lat,end.lon],{radius:10,color:'#0d2a31',weight:3,fillColor:'#f5ac8f',fillOpacity:1}).bindPopup(pop));}
-  state.mapLayer=L.layerGroup(layers).addTo(state.map);
-  const active=selectedRoute();
-  if(state.routeMode==='live'&&active?.points?.length>1){state.map.fitBounds(L.latLngBounds(active.points),{padding:[40,40],maxZoom:16});}
-  else if(start&&end){state.map.fitBounds(L.latLngBounds([[start.lat,start.lon],[end.lat,end.lon]]),{padding:[55,55],maxZoom:14});}
-  drawPlaceMarkers();
-  setTimeout(()=>state.map?.invalidateSize(),80);
+  if(!journeyMap)return;
+  const r=selectedRoute(),a=origin(),b=destination();
+  const key=JSON.stringify([state.routeMode,r?.id,r?.fetchedAt,a?.lat,a?.lon,b?.lat,b?.lon]);
+  journeyMap.update(mapSnapshot(),key!==mapPositionKey);mapPositionKey=key;
 }
-function drawPlaceMarkers(){
-  if(!state.map || !window.L)return;
-  if(state.poiLayer){state.map.removeLayer(state.poiLayer);state.poiLayer=null;}
-  if(state.placeMode!=='live'||!state.places.length)return;
-  state.poiLayer=L.layerGroup(state.places.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)).slice(0,45).map(p=>{
-    const icon=L.circleMarker([p.lat,p.lon],{radius:5,color:'#142c40',weight:2,fillColor:'#f5d8a3',fillOpacity:1});
-    // Leaflet popup uses DOM textContent, not untrusted HTML interpolation.
-    const popup=document.createElement('div');
-    const label=document.createElement('strong');label.textContent=p.name;
-    const sub=document.createElement('p');sub.textContent=`${displayCategory(p.category)} · Hours: ${p.hours||'Unknown'} · Not verified open`;
-    popup.append(label,sub);icon.bindPopup(popup);return icon;
-  })).addTo(state.map);
+function drawPlaceMarkers(){drawMap();}
+async function initializeMap(){
+  let config={};
+  try{const response=await fetch('/api/map-config',{signal:AbortSignal.timeout(5000)});if(response.ok)config=await response.json();}catch{}
+  try{
+    journeyMap=await createJourneyMap($('map'),config,(lat,lon)=>{
+      const point={name:'Selected map point',lat,lon};
+      if(state.mapPick==='origin'){state.customOrigin=point;state.originKey='custom';$('originSelect').value='custom';}
+      else{state.customDest=point;state.destKey='custom';$('destinationSelect').value='custom';}
+      invalidateExistingRoutes();toast('Point selected. Calculate a route for updated directions.');
+    },setRoute,message=>{$('mapProvider').textContent=message;});
+    $('mapFallback').style.display='none';
+    document.querySelectorAll('.map-toolbar button,.map-layers input').forEach(el=>el.disabled=false);
+    drawMap();
+  }catch{$('mapBadge').textContent='Map unavailable';$('map').style.display='none';}
+}
+function expandMap(){
+  const expanded=$('mapSection').classList.toggle('expanded-map');
+  document.body.classList.toggle('map-expanded',expanded);
+  $('expandMapBtn').textContent=expanded?'Close full map':'Full map ↗';
+  $('expandMapBtn').setAttribute('aria-expanded',String(expanded));
+  journeyMap?.resize();journeyMap?.fit();
 }
 function invalidateExistingRoutes(){
   state.routeMode='demo';state.routes=demoRoutes(state.mode);state.selectedRouteId='demo-0';clearLighting();
@@ -258,6 +236,11 @@ function bind(){
   $('originSelect').addEventListener('change',e=>{state.originKey=e.target.value;if(e.target.value==='custom'&&!state.customOrigin){toast('Choose a start by search, GPS, or tapping the map.');return;}invalidateExistingRoutes();});
   $('destinationSelect').addEventListener('change',e=>{state.destKey=e.target.value;if(e.target.value==='custom'&&!state.customDest){toast('Choose a destination by search or tapping the map.');return;}invalidateExistingRoutes();});
   $('findRoutesBtn').addEventListener('click',findRoutes);
+  $('fitMapBtn').addEventListener('click',()=>journeyMap?.fit());
+  $('expandMapBtn').addEventListener('click',expandMap);
+  $('showRoute').addEventListener('change',e=>{state.showRoute=e.target.checked;drawMap();});
+  $('showPlaces').addEventListener('change',e=>{state.showPlaces=e.target.checked;drawMap();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('mapSection').classList.contains('expanded-map')){expandMap();$('expandMapBtn').focus();}});
   $('routeCards').addEventListener('click',e=>{const n=e.target.closest('[data-route]');if(n)setRoute(n.dataset.route);});
   $('routeCards').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const n=e.target.closest('[data-route]');if(n){e.preventDefault();setRoute(n.dataset.route);}}});
   $('geolocateBtn').addEventListener('click',()=>getMyLocation());
@@ -272,5 +255,5 @@ function bind(){
   setInterval(()=>{if(state.page==='journey'&&state.trip&&!state.trip.endedAt)renderTrip();},1000);
 }
 
-bind();renderRoutes();renderTrip();renderReports();renderPlaces();loadStatus();
+bind();renderRoutes();renderTrip();renderReports();renderPlaces();loadStatus();initializeMap();
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))navigator.serviceWorker.register('/sw.js').catch(()=>{});
